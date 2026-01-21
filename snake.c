@@ -101,8 +101,8 @@ void displayWinAnimation(int cubeGrid[8][8][8]){
         mySleep(i * 100); 
         memset(cubeGrid, 0, 512); // Reset cubeGrid
         // Send message
-        mySleep(i * 100); 
-        
+        mySleep(i * 100);     
+    }
 }
 
 void setupJoystick(uint32_t adc){
@@ -122,12 +122,12 @@ void setupJoystick(uint32_t adc){
 float getJoystickInput(uint32_t adc, int channel){
     uint8_t channelArray[] = {channel};  //Define a channel that we want to look at
     adc_set_regular_sequence(adc, 1, channelArray);  //Set up the channel
-    adc_start_conversion_regular(ADC1);  //Start converting the analogue signal
+    adc_start_conversion_regular(adc);  //Start converting the analogue signal
 
     while(!(adc_eoc(adc)));  //Wait until the register is ready to read data
 
-    float adc_value = (float)adc_read_regular(ADC1);  //Read the value from the register and channel and coverts to float
-    float adc_value_scaled = (adc_value / 4095.0f) * 2.0f; // Converts the value so its in range of 0 to 2
+    float adc_value = (float)adc_read_regular(adc);  //Read the value from the register and channel and coverts to float. adc_value depends on the resolution set
+    float adc_value_scaled = (adc_value / 4095.0f) * 2.0f; // Converts the value so its in range of 0 to 2.
     return adc_value_scaled;
 }
 
@@ -160,8 +160,6 @@ bool checkSnakeCollide(int snakeBody[512][3], int frontPointer, int rearPointer)
     }
     return false; // Returns false when the snake doesn't collide
     }
-}
-
 
 int main(void) {
     #define USART_PORT USART1
@@ -220,10 +218,11 @@ void game(void){
         mySleep(500); // Waits for 500ms
         float joystick_A_x = getJoystickInput(ADC1, 1);
         float joystick_B_y = getJoystickInput(ADC1, 7);
+
         int newX = snakeBody[frontPointer][0];
         int newY = snakeBody[frontPointer][1];
         int newZ = snakeBody[frontPointer][2];
-        frontPointer++;
+
         if (joystick_A_x < 0.5){
             newX = (snakeBody[frontPointer][0] + 1) % 8;
             direction = (direction - 1 + 4) % 4; // added by +4 to ensure that it doesn't go below 0
@@ -252,7 +251,7 @@ void game(void){
                 newY = snakeBody[frontPointer][1] + planeDirection;
             }
         }
-        
+        frontPointer++;
         snakeBody[frontPointer][0] = newX;
         snakeBody[frontPointer][1] = newY;
         snakeBody[frontPointer][2] = newZ;
