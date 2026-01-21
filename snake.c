@@ -20,7 +20,8 @@ void sendMessage(int[8][8][8]);
 void displayWinAnimation(int[8][8][8]);
 void addSnakeToGrid(int[8][8][8], int[512][3], int, int);
 bool checkSnakeCollide(int[512][3], int, int);
-void mySleep(int time);
+void mySleep(int);
+void moveSnake(int[512][3], float, float, int*, int*, int*);
 void game(void);
 
 struct apple fastAppleSpawn(int [8][8][8]);
@@ -88,7 +89,6 @@ struct apple spawnApple(int cubeGrid[8][8][8]){
 }
 
 void displayWinAnimation(int cubeGrid[8][8][8]){
-    // Basically just a flickering animation
     for (int i = 4; i > 0; i--){
         for (int x = 0; x < 8; x++){
              for (int y = 0; y < 8; y++){
@@ -97,10 +97,10 @@ void displayWinAnimation(int cubeGrid[8][8][8]){
                 }
             }
         }
-        // Send message
+        sendMessage(cubeGrid);
         mySleep(i * 100); 
         memset(cubeGrid, 0, 512); // Reset cubeGrid
-        // Send message
+        sendMessage(cubeGrid);
         mySleep(i * 100);     
     }
 }
@@ -161,6 +161,45 @@ bool checkSnakeCollide(int snakeBody[512][3], int frontPointer, int rearPointer)
     return false; // Returns false when the snake doesn't collide
     }
 
+void moveSnake(int snakeBody[512][3], float joystickX, float joystickY, int *direction, int *planeDirection, int *frontPointer){
+    int newX = snakeBody[*frontPointer][0];
+    int newY = snakeBody[*frontPointer][1];
+    int newZ = snakeBody[*frontPointer][2];
+
+    if (joystickX < 0.5){
+        newX = (snakeBody[*frontPointer][0] + 1) % 8;
+        *direction = (*direction - 1 + 4) % 4; // added by +4 to ensure that it doesn't go below 0
+        *planeDirection = 0; // resets plane direction
+    } else if (joystickX > 1.45){
+        // x pos is added by 8 so it never goes below 0
+        newX = (snakeBody[*frontPointer][0] - 1 + 8) % 8;
+        *direction = (*direction + 1 + 4) % 4; // added by +4 to ensure that it doesn't go below 0
+        *planeDirection = 0;
+    } else if (joystickY < 0.5){
+        newY = (snakeBody[*frontPointer][1] + 1) % 8;
+        *direction = 0;
+        *planeDirection = -1;
+    } else if (joystickY > 1.45){
+        newY = (snakeBody[*frontPointer][1] - 1 + 8) % 8;
+        *direction = 0;
+        *planeDirection = 1;
+    } else{ // When no movement input is given. Go in direction or planeDirection
+        if (*planeDirection == 0){ // if planeDirecton = 0 then move in x or z 
+            if (*direction % 2 == 0){
+                newZ = (snakeBody[*frontPointer][2] + *direction + 8) % 8;
+            } else{
+                newX = (snakeBody[*frontPointer][0] + *direction + 8) % 8;
+            }
+        } else{ // move in y
+            newY = snakeBody[*frontPointer][1] + *planeDirection;
+        }
+    }
+    (*frontPointer)++;
+    snakeBody[*frontPointer][0] = newX;
+    snakeBody[*frontPointer][1] = newY;
+    snakeBody[*frontPointer][2] = newZ;
+    
+}
 int main(void) {
     #define USART_PORT USART1
     #define LEDCUBE_PORT GPIOB
@@ -219,42 +258,7 @@ void game(void){
         float joystick_A_x = getJoystickInput(ADC1, 1);
         float joystick_B_y = getJoystickInput(ADC1, 7);
 
-        int newX = snakeBody[frontPointer][0];
-        int newY = snakeBody[frontPointer][1];
-        int newZ = snakeBody[frontPointer][2];
-
-        if (joystick_A_x < 0.5){
-            newX = (snakeBody[frontPointer][0] + 1) % 8;
-            direction = (direction - 1 + 4) % 4; // added by +4 to ensure that it doesn't go below 0
-            planeDirection = 0; // resets plane direction
-        } else if (joystick_A_x > 1.45){
-            // x pos is added by 8 so it never goes below 0
-            newX = (snakeBody[frontPointer][0] - 1) % 8;
-            direction = (direction + 1 + 4) % 4; // added by +4 to ensure that it doesn't go below 0
-            planeDirection = 0;
-        } else if (joystick_B_y < 0.5){
-            newY = (snakeBody[frontPointer][1] + 1) % 8;
-            direction = 0;
-            planeDirection = -1;
-        } else if (joystick_B_y > 1.45){
-            newY = (snakeBody[frontPointer][1] - 1) % 8;
-            direction = 0;
-            planeDirection = 1;
-        } else{ // When no movement input is given. Go in direction or planeDirection
-            if (planeDirection == 0){ // if planeDirecton = 0 then move in x or z 
-                if (direction % 2 == 0){
-                    newZ = (snakeBody[frontPointer][2] + direction + 8) % 8;
-                } else{
-                    newX = (snakeBody[frontPointer][0] + direction + 8) % 8;
-                }
-            } else{ // move in y
-                newY = snakeBody[frontPointer][1] + planeDirection;
-            }
-        }
-        frontPointer++;
-        snakeBody[frontPointer][0] = newX;
-        snakeBody[frontPointer][1] = newY;
-        snakeBody[frontPointer][2] = newZ;
+        moveSnake(snakeBody, joystick_A_x, joystick_B_y, &direction, &planeDirection, &frontPointer);
 
         if (appleEaten){
             appleSpawned = spawnApple(cubeGrid); // Spawn an apple when it is eaten
@@ -264,7 +268,8 @@ void game(void){
         }
         cubeGrid[appleSpawned.appleX][appleSpawned.appleY][appleSpawned.appleZ] = 1; // places apple
         // Apple is eaten if the snake's head position is equal to the apple's position
-        appleEaten = appleSpawned.appleX == newX && appleSpawned.appleY == newY && appleSpawned.appleZ == newZ;
+        appleEaten = appleSpawned.appleX == snakeBody[frontPointer][0] && appleSpawned.appleY == snakeBody[frontPointer][1]
+         && appleSpawned.appleZ == snakeBody[frontPointer][2];
 
         addSnakeToGrid(cubeGrid, snakeBody, frontPointer, rearPointer);
         sendMessage(cubeGrid);
