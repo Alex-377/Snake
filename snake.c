@@ -145,9 +145,10 @@ void sendMessage(int cubeGrid[8][8][8]){
 }
 
 void addSnakeToGrid(int cubeGrid[8][8][8], int snakeBody[512][3], int frontPointer, int rearPointer){
+    cubeGrid[snakeBody[rearPointer][0]][snakeBody[rearPointer][1]][snakeBody[rearPointer][2]] = 1; // Changes the coordinate with the snake body to 1
     while (frontPointer != rearPointer){
-        cubeGrid[snakeBody[frontPointer][0]][snakeBody[frontPointer][1]][snakeBody[frontPointer][2]] = 1; // Changes the coordinate with the snake body to 1
-        frontPointer = (frontPointer + 1) % 512; // Wraps around when the end of the array is reached. 
+        rearPointer = (rearPointer + 1) % 512; // Wraps around when the end of the array is reached. 
+        cubeGrid[snakeBody[rearPointer][0]][snakeBody[rearPointer][1]][snakeBody[rearPointer][2]] = 1;
     }
 }
 
@@ -191,10 +192,10 @@ void moveSnake(int snakeBody[512][3], float joystickX, float joystickY, int *dir
                 newX = (snakeBody[*frontPointer][0] + *direction + 8) % 8;
             }
         } else{ // move in y
-            newY = snakeBody[*frontPointer][1] + *planeDirection;
+            newY = (snakeBody[*frontPointer][1] + *planeDirection + 8) % 8;
         }
     }
-    (*frontPointer)++;
+    *frontPointer = (*frontPointer + 1) % 512;
     snakeBody[*frontPointer][0] = newX;
     snakeBody[*frontPointer][1] = newY;
     snakeBody[*frontPointer][2] = newZ;
@@ -238,14 +239,13 @@ int main(void) {
 }
 
 void game(void){
-    int snakeLength;
     bool alive = true;
     bool appleEaten = true;
-    struct apple appleSpawned;
+    struct apple appleLocation;
     int cubeGrid[8][8][8];
     int snakeBody[512][3]; // [3] stores x,y,z coordinates
     int frontPointer = 0;
-    int rearPointer = -1;
+    int rearPointer = 0;
     snakeBody[0][0] = 4; // snake starts at 4,4,4
     snakeBody[0][1] = 4; 
     snakeBody[0][2] = 4; 
@@ -261,28 +261,25 @@ void game(void){
         moveSnake(snakeBody, joystick_A_x, joystick_B_y, &direction, &planeDirection, &frontPointer);
 
         if (appleEaten){
-            appleSpawned = spawnApple(cubeGrid); // Spawn an apple when it is eaten
+            appleLocation = spawnApple(cubeGrid); // Spawn an apple when it is eaten
+            if (appleLocation.appleX == -1){ // If an apple cannot be spawned then the snake is length 512. So they win
+                alive = false; 
+                displayWinAnimation(cubeGrid);
+            }
         }
         else{
-            rearPointer++;
+            rearPointer = (rearPointer + 1) % 512;
         }
-        cubeGrid[appleSpawned.appleX][appleSpawned.appleY][appleSpawned.appleZ] = 1; // places apple
+        cubeGrid[appleLocation.appleX][appleLocation.appleY][appleLocation.appleZ] = 1; // places apple
         // Apple is eaten if the snake's head position is equal to the apple's position
-        appleEaten = appleSpawned.appleX == snakeBody[frontPointer][0] && appleSpawned.appleY == snakeBody[frontPointer][1]
-         && appleSpawned.appleZ == snakeBody[frontPointer][2];
+        appleEaten = appleLocation.appleX == snakeBody[frontPointer][0] && appleLocation.appleY == snakeBody[frontPointer][1]
+         && appleLocation.appleZ == snakeBody[frontPointer][2];
 
         addSnakeToGrid(cubeGrid, snakeBody, frontPointer, rearPointer);
         sendMessage(cubeGrid);
-        snakeLength =(frontPointer - rearPointer + 512) % 512;
         if (checkSnakeCollide(snakeBody, frontPointer, rearPointer)){
             alive = false;
-            mySleep(1500); // waits to give time
-        }
-        if (snakeLength == 512){
-            // Player won
-            alive = false; 
-            displayWinAnimation(cubeGrid);
-        }
-        
+            mySleep(1500); // waits so user knows the snake died.
+        } 
     }
 }
